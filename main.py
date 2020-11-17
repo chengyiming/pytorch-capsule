@@ -84,7 +84,7 @@ def test():
 
         output = network(data)
 
-        test_loss += network.loss(data, output, target, size_average=False).data[0] # sum up batch loss
+        test_loss += network.loss(data, output, target, size_average=False).data # sum up batch loss
 
         v_mag = torch.sqrt((output**2).sum(dim=2, keepdim=True))
 
@@ -119,7 +119,7 @@ def train(epoch):
 
         loss = network.loss(data, output, target)
         loss.backward()
-        last_loss = loss.data[0]
+        last_loss = loss.data
 
         optimizer.step()
 
@@ -129,7 +129,7 @@ def train(epoch):
                 batch_idx * len(data),
                 len(train_loader.dataset),
                 100. * batch_idx / len(train_loader),
-                loss.data[0]))
+                loss.data))
 
         if last_loss < early_stop_loss:
             break

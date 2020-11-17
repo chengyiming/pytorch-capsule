@@ -17,15 +17,15 @@ from capsule_layer import CapsuleLayer
 
 class CapsuleNetwork(nn.Module):
     def __init__(self,
-                 image_width,
-                 image_height,
-                 image_channels,
-                 conv_inputs,
-                 conv_outputs,
-                 num_primary_units,
-                 primary_unit_size,
-                 num_output_units,
-                 output_unit_size):
+                 image_width, #  28
+                 image_height, # 28
+                 image_channels, #1
+                 conv_inputs,#1
+                 conv_outputs,#256
+                 num_primary_units, #8
+                 primary_unit_size,#32*6*6
+                 num_output_units,#10
+                 output_unit_size):#16
         super(CapsuleNetwork, self).__init__()
 
         self.reconstructed_image_count = 0

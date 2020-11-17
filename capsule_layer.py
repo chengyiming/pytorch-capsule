@@ -25,6 +25,8 @@ class ConvUnit(nn.Module):
         return self.conv0(x)
 
 class CapsuleLayer(nn.Module):
+    # 0 256 8 32*6*6 false
+    # 8 1152 10 16 true
     def __init__(self, in_units, in_channels, num_units, unit_size, use_routing):
         super(CapsuleLayer, self).__init__()
 
@@ -80,42 +82,55 @@ class CapsuleLayer(nn.Module):
 
         # (batch, in_units, features) -> (batch, features, in_units)
         x = x.transpose(1, 2)
+        print("x", x.size())
 
         # (batch, features, in_units) -> (batch, features, num_units, in_units, 1)
         x = torch.stack([x] * self.num_units, dim=2).unsqueeze(4)
+        print("x", x.size())
 
         # (batch, features, in_units, unit_size, num_units)
         W = torch.cat([self.W] * batch_size, dim=0)
+        print("W", W.size())
 
         # Transform inputs by weight matrix.
         # (batch_size, features, num_units, unit_size, 1)
         u_hat = torch.matmul(W, x)
+        print("u_hat:", u_hat.size())
 
         # Initialize routing logits to zero.
         b_ij = Variable(torch.zeros(1, self.in_channels, self.num_units, 1)).cuda()
+        print("b_ij:", b_ij.size())
 
         # Iterative routing.
         num_iterations = 3
         for iteration in range(num_iterations):
             # Convert routing logits to softmax.
             # (batch, features, num_units, 1, 1)
-            c_ij = F.softmax(b_ij)
+            c_ij = F.softmax(b_ij, dim= 2)
+            print("c_ij:", c_ij.size())
+
             c_ij = torch.cat([c_ij] * batch_size, dim=0).unsqueeze(4)
+            print("c_ij:", c_ij.size())
 
             # Apply routing (c_ij) to weighted inputs (u_hat).
             # (batch_size, 1, num_units, unit_size, 1)
             s_j = (c_ij * u_hat).sum(dim=1, keepdim=True)
+            print("s_j:", s_j.size())
 
             # (batch_size, 1, num_units, unit_size, 1)
             v_j = CapsuleLayer.squash(s_j)
+            print("v_j:", v_j.size())
 
             # (batch_size, features, num_units, unit_size, 1)
             v_j1 = torch.cat([v_j] * self.in_channels, dim=1)
+            print("v_j1:", v_j1.size())
 
             # (1, features, num_units, 1)
             u_vj1 = torch.matmul(u_hat.transpose(3, 4), v_j1).squeeze(4).mean(dim=0, keepdim=True)
+            print("u_vj1:", u_vj1.size())
 
             # Update b_ij (routing)
             b_ij = b_ij + u_vj1
+            print("b_ij:", b_ij.size())
 
         return v_j.squeeze(1)
