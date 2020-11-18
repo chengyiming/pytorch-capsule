@@ -140,6 +140,6 @@ def train(epoch):
 num_epochs = 10
 for epoch in range(1, num_epochs + 1):
     last_loss = train(epoch)
-    test()
+    # test()
     if last_loss < early_stop_loss:
         break
