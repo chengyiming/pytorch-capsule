@@ -6,18 +6,14 @@ from torchvision import transforms
 
 import datasets
 dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
+dataset_transform = transforms.Compose([
+                       transforms.ToTensor(),
+                       # transforms.Normalize((0.1307,), (0.3081,))
+                   ])
 
-train_dataset = datasets.TUMOR_IMG(dataset,train=True)
-test_dataset = datasets.TUMOR_IMG(dataset,train=False)
+train_dataset = datasets.TUMOR_IMG(dataset,train=True, transform = dataset_transform)
+test_dataset = datasets.TUMOR_IMG(dataset,train=False, transform= dataset_transform)
 
-# ,transform=transforms.ToTensor()
-# train_dataset = datasets.CIFAR10_IMG('./datasets',train=True)
-# print(train_dataset.filenames)
-# print(train_dataset.labels)
-# img,label= train_dataset.__getitem__(1)
-# img = np.transpose(img.numpy(),(1,2,0))
-# plt.imshow(img)
-# plt.show()
 train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=False)
 test_loader = DataLoader(dataset=test_dataset, batch_size=6, shuffle=True)
 
@@ -29,6 +25,7 @@ def imshow(img):
 
 for step ,(b_x, b_seg, b_y) in enumerate(train_loader):
     print("step:", step)
+
     if step < 1:
         # imgs = torchvision.utils.make_grid(b_x)
         # print(imgs.shape)

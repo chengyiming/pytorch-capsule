@@ -11,6 +11,7 @@ from torchvision import datasets, transforms
 import torchvision.utils as vutils
 import torch.nn.functional as F
 
+
 from capsule_conv_layer import CapsuleConvLayer
 from capsule_layer import CapsuleLayer
 
@@ -20,12 +21,12 @@ class CapsuleNetwork(nn.Module):
                  image_width, #  28
                  image_height, # 28
                  image_channels, #1
-                 conv_inputs,#1
+                 conv_inputs,# 1
                  conv_outputs,#256
                  num_primary_units, #8
                  primary_unit_size,#32*6*6
-                 num_output_units,#10
-                 output_unit_size):#16
+                 num_output_units,#3
+                 output_unit_size):#32
         super(CapsuleNetwork, self).__init__()
 
         self.reconstructed_image_count = 0
@@ -34,11 +35,40 @@ class CapsuleNetwork(nn.Module):
         self.image_width = image_width
         self.image_height = image_height
 
-        self.conv1 = CapsuleConvLayer(in_channels=conv_inputs,
-                                      out_channels=conv_outputs)
+        self.max_pool = nn.MaxPool2d(3, stride=4, padding=1)
+        # images第一个卷积层
+        self.images_conv1 = nn.Conv2d(in_channels=1,
+                               out_channels=32,
+                               kernel_size=7, # fixme constant
+                               stride=2,
+                               padding=3,
+                               bias=True)
+        # images第二个卷积层
+        self.images_conv2 = nn.Conv2d(in_channels=32,
+                               out_channels=32,
+                               kernel_size=9, # fixme constant
+                               stride=1,
+                               bias=True)
+
+        # corp_images第一个卷积层
+        self.corp_images_conv1 = nn.Conv2d(in_channels=1,
+                               out_channels=32,
+                               kernel_size=7,  # fixme constant
+                               stride=2,
+                               padding= 3,
+                               bias=True)
+        # corp_images第二个卷积层
+        self.corp_images_conv2 = nn.Conv2d(in_channels=32,
+                               out_channels=32,
+                               kernel_size=9,  # fixme constant
+                               stride=1,
+                               bias=True)
+
+        # self.merge_conv = CapsuleConvLayer(in_channels=64,
+        #                               out_channels=conv_outputs)
 
         self.primary = CapsuleLayer(in_units=0,
-                                    in_channels=conv_outputs,
+                                    in_channels=64,
                                     num_units=num_primary_units,
                                     unit_size=primary_unit_size,
                                     use_routing=False)
@@ -50,15 +80,23 @@ class CapsuleNetwork(nn.Module):
                                    use_routing=True)
 
         reconstruction_size = image_width * image_height * image_channels
-        self.reconstruct0 = nn.Linear(num_output_units*output_unit_size, int((reconstruction_size * 2) / 3))
-        self.reconstruct1 = nn.Linear(int((reconstruction_size * 2) / 3), int((reconstruction_size * 3) / 2))
-        self.reconstruct2 = nn.Linear(int((reconstruction_size * 3) / 2), reconstruction_size)
+        self.reconstruct0 = nn.Linear(num_output_units*output_unit_size, 400)
+        self.reconstruct1 = nn.Linear(400, 32*32)
+        self.reconstruct2 = nn.Linear(32*32, reconstruction_size)
 
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x):
-        return self.digits(self.primary(self.conv1(x)))
+    def forward(self, x1, x2):
+        # print("size()", self.images_conv1(self.max_pool(x1)).size())
+        images_conv2 = self.images_conv2(self.images_conv1(self.max_pool(x1)))
+        print("images_conv2:", images_conv2.size())
+        corp_images_conv2 = self.corp_images_conv2(self.corp_images_conv1(x2))
+        print("corp_images_conv2:", corp_images_conv2.size())
+        # 在深度方向进行合并
+        merge_images = torch.cat((images_conv2, corp_images_conv2), dim= 1)
+        print("merge_images:", merge_images.size())
+        return self.digits(self.primary(merge_images))
 
     def loss(self, images, input, target, size_average=True):
         return self.margin_loss(input, target, size_average) + self.reconstruction_loss(images, input, size_average)

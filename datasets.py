@@ -28,6 +28,11 @@ class TUMOR_IMG(Dataset):
 
         self.images, self.seg_images, self.labels = \
             data['images'], data["corp_images"], data['labels']
+
+        # 归一化处理
+        self.images = self.images / 255
+        self.seg_images = self.seg_images / 255
+
         assert len(self.images) == len(self.seg_images)
         assert len(self.images) == len(self.labels)
         # print(len(self.images))
@@ -38,9 +43,10 @@ class TUMOR_IMG(Dataset):
         image = self.images[index]
         corp_image = self.seg_images[index]
         label = self.labels[index]
-
+        # print(image.type())
         if self.transform is not None:
             image = self.transform(image)
+            corp_image = self.transform(corp_image)
 
         return image, corp_image, label
 

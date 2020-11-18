@@ -3,27 +3,29 @@
 # https://arxiv.org/pdf/1710.09829.pdf
 #
 
+import datasets
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
-from torchvision import datasets, transforms
+from torchvision import transforms
 import torch.nn.functional as F
 
 from capsule_network import CapsuleNetwork
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 #
 # Settings.
 #
 
 learning_rate = 0.01
 
-batch_size = 128
-test_batch_size = 128
+batch_size = 20
+test_batch_size = 20
 
 # Stop training if loss goes below this threshold.
 early_stop_loss = 0.0001
-
+dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
 #
 # Load MNIST dataset.
 #
@@ -31,35 +33,35 @@ early_stop_loss = 0.0001
 # Normalization for MNIST dataset.
 dataset_transform = transforms.Compose([
                        transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
+                       # transforms.Normalize((0.1307,), (0.3081,))
                    ])
 
-train_dataset = datasets.MNIST('../data', train=True, download=True, transform=dataset_transform)
+train_dataset = datasets.TUMOR_IMG(dataset, train=True, transform=dataset_transform)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-test_dataset = datasets.MNIST('../data', train=False, download=True, transform=dataset_transform)
+test_dataset = datasets.TUMOR_IMG(dataset, train=False, transform=dataset_transform)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
 
 #
 # Create capsule network.
 #
 
-conv_inputs = 1
+conv_inputs = 64
 conv_outputs = 256
 num_primary_units = 8
-primary_unit_size = 32 * 6 * 6  # fixme get from conv2d
-output_unit_size = 16
+primary_unit_size = 24 * 24 * 32  # fixme get from conv2d
+output_unit_size = 32
 
-network = CapsuleNetwork(image_width=28,
-                         image_height=28,
+network = CapsuleNetwork(image_width=512,
+                         image_height=512,
                          image_channels=1,
                          conv_inputs=conv_inputs,
                          conv_outputs=conv_outputs,
                          num_primary_units=num_primary_units,
                          primary_unit_size=primary_unit_size,
-                         num_output_units=10, # one for each MNIST digit
+                         num_output_units=3, # one for each MNIST digit
                          output_unit_size=output_unit_size).cuda()
-print(network)
+# print(network)
 
 
 # Converts batches of class indices to classes of one-hot vectors.
@@ -108,16 +110,18 @@ def train(epoch):
     last_loss = None
     log_interval = 1
     network.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        target_one_hot = to_one_hot(target, length=network.digits.num_units)
+    for batch_idx, (images, corp_images, labels) in enumerate(train_loader):
+        target_one_hot = to_one_hot(labels, length=network.digits.num_units)
 
-        data, target = Variable(data).cuda(), Variable(target_one_hot).cuda()
+        images, corp_images, labels = images.type(torch.FloatTensor).cuda(), \
+                                      corp_images.type(torch.FloatTensor).cuda(),\
+                                      target_one_hot.cuda()
 
         optimizer.zero_grad()
 
-        output = network(data)
+        output = network(images, corp_images)
 
-        loss = network.loss(data, output, target)
+        loss = network.loss(images, output, labels)
         loss.backward()
         last_loss = loss.data
 
@@ -126,7 +130,7 @@ def train(epoch):
         if batch_idx % log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch,
-                batch_idx * len(data),
+                batch_idx * len(images),
                 len(train_loader.dataset),
                 100. * batch_idx / len(train_loader),
                 loss.data))
