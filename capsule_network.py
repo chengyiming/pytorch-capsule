@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from capsule_conv_layer import CapsuleConvLayer
 from capsule_layer import CapsuleLayer
+from capsule_upsample_conv_layer import CapsuleUpsampleConvLayer
 
 
 class CapsuleNetwork(nn.Module):
@@ -80,9 +81,16 @@ class CapsuleNetwork(nn.Module):
                                    use_routing=True)
 
         reconstruction_size = image_width * image_height * image_channels
-        self.reconstruct0 = nn.Linear(num_output_units*output_unit_size, 400)
-        self.reconstruct1 = nn.Linear(400, 32*32)
-        self.reconstruct2 = nn.Linear(32*32, reconstruction_size)
+        self.reconstruct0 = nn.Linear(32, 256)
+        self.reconstruct1 = CapsuleUpsampleConvLayer(16, 4, 8, 'nearest')
+        self.reconstruct2 = CapsuleUpsampleConvLayer(4, 8, 4, 'nearest')
+        self.reconstruct3 = CapsuleUpsampleConvLayer(8, 16, 4, 'nearest')
+        self.compact_layer = nn.Conv2d(in_channels=16,
+                                      out_channels=1,
+                                      kernel_size=3,  # fixme constant
+                                      stride=1,
+                                      padding=1,
+                                      bias=True)
 
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
@@ -90,22 +98,26 @@ class CapsuleNetwork(nn.Module):
     def forward(self, x1, x2):
         # print("size()", self.images_conv1(self.max_pool(x1)).size())
         images_conv2 = self.images_conv2(self.images_conv1(self.max_pool(x1)))
-        print("images_conv2:", images_conv2.size())
+        # print("images_conv2:", images_conv2.size())
         corp_images_conv2 = self.corp_images_conv2(self.corp_images_conv1(x2))
-        print("corp_images_conv2:", corp_images_conv2.size())
+        # print("corp_images_conv2:", corp_images_conv2.size())
         # 在深度方向进行合并
         merge_images = torch.cat((images_conv2, corp_images_conv2), dim= 1)
-        print("merge_images:", merge_images.size())
+        # print("merge_images:", merge_images.size())
         return self.digits(self.primary(merge_images))
 
     def loss(self, images, input, target, size_average=True):
         return self.margin_loss(input, target, size_average) + self.reconstruction_loss(images, input, size_average)
 
     def margin_loss(self, input, target, size_average=True):
+        # [20, 3, 32, 1]
+        print("input.size():", input.size())
         batch_size = input.size(0)
 
         # ||vc|| from the paper.
+        # [20, 3, 1, 1]
         v_mag = torch.sqrt((input**2).sum(dim=2, keepdim=True))
+        print("v_mag.size():", v_mag.size())
 
         # Calculate left and right max() terms from equation 4 in the paper.
         zero = Variable(torch.zeros(1)).cuda()
@@ -118,8 +130,10 @@ class CapsuleNetwork(nn.Module):
         loss_lambda = 0.5
         T_c = target
         L_c = T_c * max_l + loss_lambda * (1.0 - T_c) * max_r
+        # 对三个类求和
         L_c = L_c.sum(dim=1)
 
+        # 求一个batch的平均损失
         if size_average:
             L_c = L_c.mean()
 
@@ -127,50 +141,57 @@ class CapsuleNetwork(nn.Module):
 
     def reconstruction_loss(self, images, input, size_average=True):
         # Get the lengths of capsule outputs.
+        # [20, 3, 1]
         v_mag = torch.sqrt((input**2).sum(dim=2))
-
+        print("v_mag:", v_mag.size())
         # Get index of longest capsule output.
         _, v_max_index = v_mag.max(dim=1)
         v_max_index = v_max_index.data
+        # [20, 1]
+        print("v_max_index.size():", v_max_index.size())
 
         # Use just the winning capsule's representation (and zeros for other capsules) to reconstruct input image.
         batch_size = input.size(0)
-        all_masked = [None] * batch_size
-        for batch_idx in range(batch_size):
-            # Get one sample from the batch.
-            input_batch = input[batch_idx]
+        # 20
+        print("batch_size:", batch_size)
+        print("v_max_index", v_max_index.type())
 
-            # Copy only the maximum capsule index from this batch sample.
-            # This masks out (leaves as zero) the other capsules in this sample.
-            batch_masked = Variable(torch.zeros(input_batch.size())).cuda()
-            batch_masked[v_max_index[batch_idx]] = input_batch[v_max_index[batch_idx]]
-            all_masked[batch_idx] = batch_masked
+        one_hot_labels = torch.zeros(batch_size, 3).scatter(1, v_max_index.cpu(), 1).unsqueeze(-1)
+        # [20, 3, 1]
+        print("one_hot_labels:", one_hot_labels.size())
 
-        # Stack masked capsules over the batch dimension.
-        masked = torch.stack(all_masked, dim=0)
+        masked = torch.matmul(input.squeeze().transpose(1,2), one_hot_labels.cuda())
+        print("masked:", masked.size())
 
         # Reconstruct input image.
         masked = masked.view(input.size(0), -1)
+        print("masked:", masked.size())
+        # 32->256
         output = self.relu(self.reconstruct0(masked))
-        output = self.relu(self.reconstruct1(output))
-        output = self.sigmoid(self.reconstruct2(output))
-        output = output.view(-1, self.image_channels, self.image_height, self.image_width)
+        print("output.size():", output.size())
+        # 20 16 4 4
+        output = output.view((-1, 16, 4, 4))
+        print("output.size():", output.size())
+        output = self.reconstruct1(output)
+        # [32 32 4]
+        print("output.size():", output.size())
 
-        # Save reconstructed images occasionally.
-        if self.reconstructed_image_count % 10 == 0:
-            if output.size(1) == 2:
-                # handle two-channel images
-                zeros = torch.zeros(output.size(0), 1, output.size(2), output.size(3))
-                output_image = torch.cat([zeros, output.data.cpu()], dim=1)
-            else:
-                # assume RGB or grayscale
-                output_image = output.data.cpu()
-            vutils.save_image(output_image, "reconstruction.png")
-        self.reconstructed_image_count += 1
+        output = self.reconstruct2(output)
+        # [128 128 8]
+        print("output.size():", output.size())
+
+        output = self.reconstruct3(output)
+        # [512 512 16]
+        print("output.size():", output.size())
+
+        #压缩为一层, 也叫做解码层
+        decode = self.sigmoid(self.compact_layer(output))
+        # [20, 1, 512, 512]
+        print("decode.size():", decode.size())
 
         # The reconstruction loss is the sum squared difference between the input image and reconstructed image.
         # Multiplied by a small number so it doesn't dominate the margin (class) loss.
-        error = (output - images).view(output.size(0), -1)
+        error = (decode - images).view(decode.size(0), -1)
         error = error**2
         error = torch.sum(error, dim=1) * 0.0005
 
@@ -179,3 +200,25 @@ class CapsuleNetwork(nn.Module):
             error = error.mean()
 
         return error
+
+    def acc(self, input, target):
+        # input [20, 3, 32, 1]
+        # target [20, 1]
+        # Get the lengths of capsule outputs.
+        # [20, 3, 1]
+        v_mag = torch.sqrt((input ** 2).sum(dim=2))
+        print("v_mag:", v_mag.size())
+        # Get index of longest capsule output.
+        _, v_max_index = v_mag.max(dim=1)
+        v_max_index = v_max_index.data
+        # [20, 1]
+        print("v_max_index.size():", v_max_index.size())
+        predicted_class = v_max_index.squeeze()
+        print("target.size():", target.size())
+        correct_prediction = torch.eq(predicted_class, target)
+        accuracy = torch.mean(correct_prediction.float())
+        return predicted_class, correct_prediction, accuracy
+
+
+
+

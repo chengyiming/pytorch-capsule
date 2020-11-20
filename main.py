@@ -3,16 +3,16 @@
 # https://arxiv.org/pdf/1710.09829.pdf
 #
 
-import datasets
+import os
+
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 from torchvision import transforms
-import torch.nn.functional as F
 
+import datasets
 from capsule_network import CapsuleNetwork
-import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 #
 # Settings.
@@ -26,11 +26,10 @@ test_batch_size = 20
 # Stop training if loss goes below this threshold.
 early_stop_loss = 0.0001
 dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
-#
-# Load MNIST dataset.
-#
 
-# Normalization for MNIST dataset.
+# load the data
+
+# Normalization for TUMOR dataset.
 dataset_transform = transforms.Compose([
                        transforms.ToTensor(),
                        # transforms.Normalize((0.1307,), (0.3081,))
@@ -45,7 +44,6 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_si
 #
 # Create capsule network.
 #
-
 conv_inputs = 64
 conv_outputs = 256
 num_primary_units = 8
@@ -105,6 +103,7 @@ def test():
 # This is the train function from the basic Pytorch MNIST example, but adapted to use the capsule network.
 # https://github.com/pytorch/examples/blob/master/mnist/main.py
 def train(epoch):
+
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
 
     last_loss = None
