@@ -51,6 +51,7 @@ class CapsuleLayer(nn.Module):
 
     @staticmethod
     def squash(s):
+        s += 0.00001
         # This is equation 1 from the paper.
         mag_sq = torch.sum(s**2, dim=2, keepdim=True)
         mag = torch.sqrt(mag_sq)

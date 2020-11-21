@@ -8,12 +8,12 @@ dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
 test_batch_size = 20
 
 # Converts batches of class indices to classes of one-hot vectors.
-def to_one_hot(index, length):
+def to_one_hot(batch_size, index, length):
     # batch_size = x.size(0)
     # x_one_hot = torch.zeros(batch_size, length)
     # for i in range(batch_size):
     #     x_one_hot[i, x[i]] = 1.0
-    return torch.zeros(test_batch_size, length).scatter_(1, index, 1)
+    return torch.zeros(batch_size, length).scatter(1, index.unsqueeze(1).long(), 1)
 
 def test(dataset):
     dataset_transform = transforms.Compose([
@@ -28,16 +28,26 @@ def test(dataset):
     test_loss = 0
     correct = 0
 
-    for batch_idx, (images, corp_images, labels) in enumerate(test_loader):
-        target_indices = target
-        target_one_hot = to_one_hot(target_indices, length=model.digits.num_units)
+    for batch_idx, (images, corp_images, target) in enumerate(test_loader):
+        # 数据归一化
+        images /= 255
+        corp_images /= 255
 
-        data, target = Variable(images.float()).cuda(), Variable(target_one_hot).cuda()
+        batch_size = images.size(0)
+        # print("batch_idx:", batch_idx)
+        # print("images.size():", images.size())
+        # print("target.size():", target.size())
+        target_indices = target.long().cpu()
+        target_one_hot = to_one_hot(batch_size, target, length=model.digits.num_units)
+
+        images, corp_images, target = Variable(images.float()).cuda(), \
+                                    Variable(corp_images.float()).cuda(),\
+                                    Variable(target_one_hot).cuda()
 
         output = model(images, corp_images)
 
-        test_loss += model.loss(images, output, target, size_average=False).data # sum up batch loss
-
+        test_loss += model.loss(images, output, target, size_average=False).data.sum(dim=0) # sum up batch loss
+        # print(test_loss)
         v_mag = torch.sqrt((output**2).sum(dim=2, keepdim=True))
 
         pred = v_mag.data.max(1, keepdim=True)[1].cpu()

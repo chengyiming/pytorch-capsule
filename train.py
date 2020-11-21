@@ -13,9 +13,9 @@ import test
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
-learning_rate = 0.01
+learning_rate = 0.0001
 
-batch_size = 20
+batch_size = 32
 
 # Stop training if loss goes below this threshold.
 early_stop_loss = 0.0001
@@ -69,6 +69,10 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
         log_interval = 1
         model.train()
         for batch_idx, (images, corp_images, labels) in enumerate(train_loader):
+            # 数据归一化
+            images /= 255
+            corp_images /= 255
+
             origin_labels = labels.long().cuda()
             # images.type(): torch.DoubleTensor
             # images.size(): torch.Size([20, 1, 512, 512])
@@ -104,6 +108,7 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
 
             if last_loss < early_stop_loss:
                 break
+            break
 
         # 保存
         if not os.path.exists(output_path):
