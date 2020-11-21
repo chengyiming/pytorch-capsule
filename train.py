@@ -1,5 +1,3 @@
-import os
-
 import torch
 import torch.optim as optim
 import torch.utils.data
@@ -9,6 +7,9 @@ from torchvision import transforms
 import datasets
 from capsule_network import CapsuleNetwork
 import test
+from tensorboardX import SummaryWriter
+import os
+from conf import global_settings as settings
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
@@ -28,17 +29,13 @@ primary_unit_size = 24 * 24 * 32  # fixme get from conv2d
 output_unit_size = 32
 
 
-start_epoch = 0
+
 MAX_EPOCH = 10
 
 checkpoint_file = 'model.pt'
 
 # Converts batches of class indices to classes of one-hot vectors.
 def to_one_hot(index, length):
-    # batch_size = x.size(0)
-    # x_one_hot = torch.zeros(batch_size, length)
-    # for i in range(batch_size):
-    #     x_one_hot[i, x[i]] = 1.0
     return torch.zeros(batch_size, length).scatter(1, index.unsqueeze(1).long(), 1)
 model = CapsuleNetwork(image_width=512,
                              image_height=512,
@@ -53,8 +50,7 @@ model = CapsuleNetwork(image_width=512,
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 # Normalization for TUMOR dataset.
-
-
+# ToTensor将图片从(N W H C)->(N C W H)
 def train(dataset, model, optimizer, start_epoch, output_path = None):
     dataset_transform = transforms.Compose([
         transforms.ToTensor(),
@@ -69,10 +65,7 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
         log_interval = 1
         model.train()
         for batch_idx, (images, corp_images, labels) in enumerate(train_loader):
-            # 数据归一化
-            images /= 255
-            corp_images /= 255
-
+            # print("images[0]:", images[0])
             origin_labels = labels.long().cuda()
             # images.type(): torch.DoubleTensor
             # images.size(): torch.Size([20, 1, 512, 512])
@@ -89,12 +82,26 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
 
             output = model(images, corp_images)
 
+            # 总的迭代次数
+            n_iter  = (epoch - 1)*len(train_loader) + batch_idx - 1
+
 
             loss = model.loss(images, output, labels)
             _, _, acc = model.acc(output, origin_labels)
             loss.backward()
             last_loss = loss.data
             optimizer.step()
+
+            # 以每个batch为单位的日志记录
+            writer.add_scalar("Train/acc(batch)", acc, n_iter)
+            writer.add_scalar("Train/loss(batch)", loss.item(), n_iter)
+
+            # TODO 不知道是干啥的，观察观察
+            for name, param in model.named_parameters():
+                layer, attr = os.path.splitext(name)
+                attr = attr[1:]
+                writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
+
 
             if batch_idx % log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc:{:.6f}'.format(
@@ -114,7 +121,7 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
         if not os.path.exists(output_path):
             # 创建目录
             os.makedirs(output_path)
-        test.test(dataset)
+        test.test(dataset, epoch)
         checkpoint = {
             'model_state_dict':model.state_dict(),
             'optimizer.state_dict':optimizer.state_dict(),
@@ -135,4 +142,7 @@ if __name__ == "__main__":
         start_epoch = checkpoint['epoch']
     else:
         print("train from the begining")
+    writer = SummaryWriter(logdir=os.path.join(settings.LOGDIR, settings.TIME_NOW))
+    start_epoch = 0
     train(dataset, model, optimizer, start_epoch, output_path)
+    writer.close()

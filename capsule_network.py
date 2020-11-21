@@ -10,6 +10,9 @@ from torch.autograd import Variable
 from torchvision import datasets, transforms
 import torchvision.utils as vutils
 import torch.nn.functional as F
+from active_function import Mish
+
+
 
 
 from capsule_conv_layer import CapsuleConvLayer
@@ -95,16 +98,13 @@ class CapsuleNetwork(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.dropout= nn.Dropout(p=0.7)
+        self.mish = Mish()
 
     def forward(self, x1, x2):
-        # print("size()", self.images_conv1(self.max_pool(x1)).size())
         images_conv2 = self.dropout(self.images_conv2(self.images_conv1(self.max_pool(x1))))
-        # print("images_conv2:", images_conv2.size())
         corp_images_conv2 = self.dropout(self.corp_images_conv2(self.corp_images_conv1(x2)))
-        # print("corp_images_conv2:", corp_images_conv2.size())
         # 在深度方向进行合并
         merge_images = torch.cat((images_conv2, corp_images_conv2), dim= 1)
-        # print("merge_images:", merge_images.size())
         return self.digits(self.primary(merge_images))
 
     def loss(self, images, input, target, size_average=True):
@@ -113,7 +113,6 @@ class CapsuleNetwork(nn.Module):
     def margin_loss(self, input, target, size_average=True):
         # [20, 3, 32, 1]
         batch_size = input.size(0)
-        print(batch_size)
 
         # ||vc|| from the paper.
         # [20, 3, 1, 1]
@@ -136,6 +135,7 @@ class CapsuleNetwork(nn.Module):
         # 求一个batch的平均损失
         if size_average:
             L_c = L_c.mean()
+        print("margin_loss:", L_c)
 
         return L_c
 
@@ -150,7 +150,6 @@ class CapsuleNetwork(nn.Module):
 
         # Use just the winning capsule's representation (and zeros for other capsules) to reconstruct input image.
         batch_size = input.size(0)
-        # print(batch_size)
         # 20
 
         one_hot_labels = torch.zeros(batch_size, 3).scatter(1, v_max_index.cpu(), 1).unsqueeze(-1)
@@ -186,6 +185,8 @@ class CapsuleNetwork(nn.Module):
         # Average over batch
         if size_average:
             error = error.mean()
+
+        print("reconstruction_loss:", error)
 
         return error
 
