@@ -97,18 +97,23 @@ class CapsuleNetwork(nn.Module):
 
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
-        self.dropout= nn.Dropout(p=0.7)
         self.mish = Mish()
 
+        self.dropout = nn.Dropout(p=0.7)
+
     def forward(self, x1, x2):
-        images_conv2 = self.dropout(self.images_conv2(self.images_conv1(self.max_pool(x1))))
-        corp_images_conv2 = self.dropout(self.corp_images_conv2(self.corp_images_conv1(x2)))
+        images_conv1 = self.relu(self.images_conv1(self.max_pool(x1)))
+        images_conv2 = 0.2*self.dropout(self.relu(self.images_conv2(images_conv1)))
+
+        corp_conv1 = self.relu(self.corp_images_conv1(x2))
+        corp_conv2 = 0.8*self.dropout(self.relu(self.corp_images_conv2(corp_conv1)))
+
         # 在深度方向进行合并
-        merge_images = torch.cat((images_conv2, corp_images_conv2), dim= 1)
+        merge_images = torch.cat((images_conv2, corp_conv2), dim= 1)
         return self.digits(self.primary(merge_images))
 
     def loss(self, images, input, target, size_average=True):
-        return self.margin_loss(input, target, size_average) + self.reconstruction_loss(images, input, size_average)
+        return self.margin_loss(input, target, size_average) + 0.0005*self.reconstruction_loss(images, input, size_average)
 
     def margin_loss(self, input, target, size_average=True):
         # [20, 3, 32, 1]
@@ -119,7 +124,7 @@ class CapsuleNetwork(nn.Module):
         v_mag = torch.sqrt((input**2).sum(dim=2, keepdim=True))
 
         # Calculate left and right max() terms from equation 4 in the paper.
-        zero = Variable(torch.zeros(1)).cuda()
+        zero = torch.zeros(1).cuda()
         m_plus = 0.9
         m_minus = 0.1
         max_l = torch.max(m_plus - v_mag, zero).view(batch_size, -1)**2
@@ -133,9 +138,9 @@ class CapsuleNetwork(nn.Module):
         L_c = L_c.sum(dim=1)
 
         # 求一个batch的平均损失
-        if size_average:
-            L_c = L_c.mean()
-        print("margin_loss:", L_c)
+        # if size_average:
+        L_c = L_c.mean()
+        # print("margin_loss:", L_c)
 
         return L_c
 
@@ -179,14 +184,16 @@ class CapsuleNetwork(nn.Module):
         # The reconstruction loss is the sum squared difference between the input image and reconstructed image.
         # Multiplied by a small number so it doesn't dominate the margin (class) loss.
         error = (decode - images).view(decode.size(0), -1)
+        # print("decode:", torch.max(decode), torch.min(decode))
+        # print("images:", torch.max(images), torch.min(images))
         error = error**2
-        error = torch.sum(error, dim=1) * 0.0005
+        # error = torch.sum(error, dim=1) * 0.0005
 
         # Average over batch
-        if size_average:
-            error = error.mean()
+        # if size_average:
+        error = error.mean()
 
-        print("reconstruction_loss:", error)
+        # print("reconstruction_loss:", error)
 
         return error
 

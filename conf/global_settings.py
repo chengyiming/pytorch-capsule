@@ -1,7 +1,7 @@
 from datetime import datetime
 
 # tensorboard log
-LOG_DIR='runs'
+LOGDIR='runs'
 
 #time of we run the script
 TIME_NOW = datetime.now().isoformat()

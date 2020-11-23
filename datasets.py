@@ -4,6 +4,7 @@ import numpy as np
 from torch.utils.data import Dataset,DataLoader
 import os
 import pickle
+import torch
 
 TRAIN_FILE = "train.p"
 TEST_FILE = "test.p"
@@ -47,6 +48,7 @@ class TUMOR_IMG(Dataset):
         if self.transform is not None:
             image = self.transform(image)
             corp_image = self.transform(corp_image)
+        # print("image_max_min-dataset:", torch.max(torch.Tensor(image)), torch.min(torch.Tensor(image)))
 
         return image, corp_image, label
 

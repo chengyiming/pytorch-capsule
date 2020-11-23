@@ -16,7 +16,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 learning_rate = 0.0001
 
-batch_size = 32
+batch_size = 50
 
 # Stop training if loss goes below this threshold.
 early_stop_loss = 0.0001
@@ -30,12 +30,12 @@ output_unit_size = 32
 
 
 
-MAX_EPOCH = 10
-
+MAX_EPOCH = 50
+start_epoch = 0
 checkpoint_file = 'model.pt'
 
 # Converts batches of class indices to classes of one-hot vectors.
-def to_one_hot(index, length):
+def to_one_hot(batch_size, index, length):
     return torch.zeros(batch_size, length).scatter(1, index.unsqueeze(1).long(), 1)
 model = CapsuleNetwork(image_width=512,
                              image_height=512,
@@ -58,25 +58,28 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
     ])
 
     train_dataset = datasets.TUMOR_IMG(dataset, train=True, transform=dataset_transform)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     # 尝试加载
     for epoch in range(start_epoch + 1, MAX_EPOCH):
         last_loss = None
         log_interval = 1
         model.train()
         for batch_idx, (images, corp_images, labels) in enumerate(train_loader):
+            # images = images.transpose(1,3).transpose(2,3)
+            # corp_images = corp_images.transpose(1,3).transpose(2,3)
             # print("images[0]:", images[0])
             origin_labels = labels.long().cuda()
             # images.type(): torch.DoubleTensor
             # images.size(): torch.Size([20, 1, 512, 512])
             # labels.type(): torch.IntTensor
             # labels.size(): torch.Size([20])
+            # print("images-max-min:", torch.max(images[0][0][0][100]), torch.min(images))
 
-            target_one_hot = to_one_hot(labels, length=model.digits.num_units)
+            target_one_hot = to_one_hot(images.size(0), labels, length=model.digits.num_units)
 
-            images, corp_images, labels = Variable(images.float()).cuda(), \
-                                          Variable(corp_images.float()).cuda(), \
-                                          Variable(target_one_hot).cuda()
+            images, corp_images, labels = images.float().cuda(), \
+                                          corp_images.float().cuda(), \
+                                          target_one_hot.cuda()
 
             optimizer.zero_grad()
 
@@ -115,7 +118,6 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
 
             if last_loss < early_stop_loss:
                 break
-            break
 
         # 保存
         if not os.path.exists(output_path):
@@ -143,6 +145,5 @@ if __name__ == "__main__":
     else:
         print("train from the begining")
     writer = SummaryWriter(logdir=os.path.join(settings.LOGDIR, settings.TIME_NOW))
-    start_epoch = 0
     train(dataset, model, optimizer, start_epoch, output_path)
     writer.close()
