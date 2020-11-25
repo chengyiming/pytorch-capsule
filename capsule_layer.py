@@ -53,7 +53,7 @@ class CapsuleLayer(nn.Module):
     def squash(s):
         s += 0.00001
         # This is equation 1 from the paper.
-        mag_sq = torch.sum(s**2, dim=2, keepdim=True)
+        mag_sq = torch.sum(s**2, dim=-2, keepdim=True)
         mag = torch.sqrt(mag_sq)
         s = (mag_sq / (1.0 + mag_sq)) * (s / mag)
         return s
@@ -98,7 +98,7 @@ class CapsuleLayer(nn.Module):
         b_ij = torch.zeros(1, self.in_channels, self.num_units, 1).cuda()
 
         # Iterative routing.
-        num_iterations = 3
+        num_iterations = 4
         for iteration in range(num_iterations):
             # Convert routing logits to softmax.
             # (batch, features, num_units, 1, 1)
@@ -110,8 +110,12 @@ class CapsuleLayer(nn.Module):
             # (batch_size, 1, num_units, unit_size, 1)
             s_j = (c_ij * u_hat).sum(dim=1, keepdim=True)
 
+            # s_j: torch.Size([35, 1, 3, 32, 1])
+            # v_j: torch.Size([35, 1, 3, 32, 1])
+            # print("s_j:", s_j.size())
             # (batch_size, 1, num_units, unit_size, 1)
             v_j = CapsuleLayer.squash(s_j)
+            # print("v_j:", v_j.size())
 
             # (batch_size, features, num_units, unit_size, 1)
             v_j1 = torch.cat([v_j] * self.in_channels, dim=1)

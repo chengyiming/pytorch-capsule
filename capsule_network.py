@@ -11,7 +11,7 @@ from torchvision import datasets, transforms
 import torchvision.utils as vutils
 import torch.nn.functional as F
 from active_function import Mish
-
+from create_conv import CreateConv
 
 
 
@@ -39,33 +39,35 @@ class CapsuleNetwork(nn.Module):
         self.image_width = image_width
         self.image_height = image_height
 
-        self.max_pool = nn.MaxPool2d(3, stride=4, padding=1)
+        self.max_pool = nn.MaxPool2d(4, stride=4)
         # images第一个卷积层
-        self.images_conv1 = nn.Conv2d(in_channels=1,
+        self.images_conv1 = CreateConv(in_channels=1,
                                out_channels=32,
-                               kernel_size=7, # fixme constant
+                               kernel_size=8, # fixme constant
                                stride=2,
                                padding=3,
                                bias=True)
         # images第二个卷积层
-        self.images_conv2 = nn.Conv2d(in_channels=32,
+        self.images_conv2 = CreateConv(in_channels=32,
                                out_channels=32,
                                kernel_size=9, # fixme constant
                                stride=1,
+                               padding= 0,
                                bias=True)
 
         # corp_images第一个卷积层
-        self.corp_images_conv1 = nn.Conv2d(in_channels=1,
+        self.corp_images_conv1 = CreateConv(in_channels=1,
                                out_channels=32,
-                               kernel_size=7,  # fixme constant
+                               kernel_size=8,  # fixme constant
                                stride=2,
                                padding= 3,
                                bias=True)
         # corp_images第二个卷积层
-        self.corp_images_conv2 = nn.Conv2d(in_channels=32,
+        self.corp_images_conv2 = CreateConv(in_channels=32,
                                out_channels=32,
                                kernel_size=9,  # fixme constant
                                stride=1,
+                               padding= 0,
                                bias=True)
 
         # self.merge_conv = CapsuleConvLayer(in_channels=64,
@@ -102,11 +104,11 @@ class CapsuleNetwork(nn.Module):
         self.dropout = nn.Dropout(p=0.7)
 
     def forward(self, x1, x2):
-        images_conv1 = self.relu(self.images_conv1(self.max_pool(x1)))
-        images_conv2 = 0.2*self.dropout(self.relu(self.images_conv2(images_conv1)))
+        images_conv1 = self.images_conv1(self.max_pool(x1))
+        images_conv2 = 0.2*self.dropout(self.images_conv2(images_conv1))
 
-        corp_conv1 = self.relu(self.corp_images_conv1(x2))
-        corp_conv2 = 0.8*self.dropout(self.relu(self.corp_images_conv2(corp_conv1)))
+        corp_conv1 = self.corp_images_conv1(x2)
+        corp_conv2 = 0.8*self.dropout(self.corp_images_conv2(corp_conv1))
 
         # 在深度方向进行合并
         merge_images = torch.cat((images_conv2, corp_conv2), dim= 1)
@@ -122,6 +124,9 @@ class CapsuleNetwork(nn.Module):
         # ||vc|| from the paper.
         # [20, 3, 1, 1]
         v_mag = torch.sqrt((input**2).sum(dim=2, keepdim=True))
+        # print("input:", input[0])
+        # print("target:", target)
+        # print("v_mag:", v_mag[0])
 
         # Calculate left and right max() terms from equation 4 in the paper.
         zero = torch.zeros(1).cuda()

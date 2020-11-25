@@ -1,22 +1,22 @@
+import os
+
 import torch
 import torch.optim as optim
 import torch.utils.data
-from torch.autograd import Variable
+from tensorboardX import SummaryWriter
 from torchvision import transforms
 
 import datasets
 from capsule_network import CapsuleNetwork
-import test
-from tensorboardX import SummaryWriter
-import os
 from conf import global_settings as settings
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 
 learning_rate = 0.0001
 
-batch_size = 50
+test_batch_size = 35
+batch_size = 35
 
 # Stop training if loss goes below this threshold.
 early_stop_loss = 0.0001
@@ -30,7 +30,7 @@ output_unit_size = 32
 
 
 
-MAX_EPOCH = 50
+MAX_EPOCH = 51
 start_epoch = 0
 checkpoint_file = 'model.pt'
 
@@ -49,6 +49,51 @@ model = CapsuleNetwork(image_width=512,
 
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+def test(dataset, epoch):
+    dataset_transform = transforms.Compose([
+        transforms.ToTensor(),
+        # transforms.Normalize((0.1307,), (0.3081,))
+    ])
+
+    test_dataset = datasets.TUMOR_IMG(dataset, train=False, transform=dataset_transform)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
+
+    test_loss = 0
+    correct = 0
+
+    for batch_idx, (images, corp_images, target) in enumerate(test_loader):
+
+        batch_size = images.size(0)
+
+        target_indices = target.long().cpu()
+        target_one_hot = to_one_hot(batch_size, target, length=model.digits.num_units)
+
+        images, corp_images, target = images.float().cuda(), \
+                                      corp_images.float().cuda(), \
+                                      target_one_hot.cuda()
+
+
+        output = model(images, corp_images)
+
+        test_loss += model.loss(images, output, target, size_average=False).data.sum(dim=0)  # sum up batch loss
+
+        v_mag = torch.sqrt((output ** 2).sum(dim=2, keepdim=True))
+
+        pred = v_mag.data.max(1, keepdim=True)[1].cpu()
+
+        correct += pred.eq(target_indices.view_as(pred)).sum()
+
+    test_loss /= len(test_loader.dataset)
+    # 日志记录
+    writer.add_scalar("Test/acc", correct / len(test_loader.dataset), epoch)
+    writer.add_scalar("Test/loss", test_loss, epoch)
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        test_loss,
+        correct,
+        len(test_loader.dataset),
+        100. * correct / len(test_loader.dataset)))
+
+
 # Normalization for TUMOR dataset.
 # ToTensor将图片从(N W H C)->(N C W H)
 def train(dataset, model, optimizer, start_epoch, output_path = None):
@@ -62,9 +107,10 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
     # 尝试加载
     for epoch in range(start_epoch + 1, MAX_EPOCH):
         last_loss = None
-        log_interval = 1
+        log_interval = 5
         model.train()
         for batch_idx, (images, corp_images, labels) in enumerate(train_loader):
+            # print("target1:", labels)
             # images = images.transpose(1,3).transpose(2,3)
             # corp_images = corp_images.transpose(1,3).transpose(2,3)
             # print("images[0]:", images[0])
@@ -80,6 +126,8 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
             images, corp_images, labels = images.float().cuda(), \
                                           corp_images.float().cuda(), \
                                           target_one_hot.cuda()
+
+            # print("target2:", labels)
 
             optimizer.zero_grad()
 
@@ -123,7 +171,7 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
         if not os.path.exists(output_path):
             # 创建目录
             os.makedirs(output_path)
-        test.test(dataset, epoch)
+        # test(dataset, epoch)
         checkpoint = {
             'model_state_dict':model.state_dict(),
             'optimizer.state_dict':optimizer.state_dict(),

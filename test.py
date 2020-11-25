@@ -1,23 +1,41 @@
 import datasets
 import torch
 from torchvision import transforms
-from train import model
-from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 import conf.global_settings as settings
 import os
+from capsule_network import CapsuleNetwork
+
+
+conv_inputs = 64
+conv_outputs = 256
+num_primary_units = 8
+primary_unit_size = 24 * 24 * 32  # fixme get from conv2d
+output_unit_size = 32
+
+
+checkpoint_file = 'model.pt'
+
+# Converts batches of class indices to classes of one-hot vectors.
+def to_one_hot(batch_size, index, length):
+    return torch.zeros(batch_size, length).scatter(1, index.unsqueeze(1).long(), 1)
+model = CapsuleNetwork(image_width=512,
+                             image_height=512,
+                             image_channels=1,
+                             conv_inputs=conv_inputs,
+                             conv_outputs=conv_outputs,
+                             num_primary_units=num_primary_units,
+                             primary_unit_size=primary_unit_size,
+                             num_output_units=3,  # one for each MNIST digit
+                             output_unit_size=output_unit_size).cuda()
 
 writer = SummaryWriter(logdir=os.path.join(settings.LOGDIR, settings.TIME_NOW))
 
 dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
-test_batch_size = 20
+test_batch_size = 32
 
 # Converts batches of class indices to classes of one-hot vectors.
 def to_one_hot(batch_size, index, length):
-    # batch_size = x.size(0)
-    # x_one_hot = torch.zeros(batch_size, length)
-    # for i in range(batch_size):
-    #     x_one_hot[i, x[i]] = 1.0
     return torch.zeros(batch_size, length).scatter(1, index.unsqueeze(1).long(), 1)
 
 def test(dataset, epoch):
@@ -29,21 +47,30 @@ def test(dataset, epoch):
     test_dataset = datasets.TUMOR_IMG(dataset, train=False, transform=dataset_transform)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
     # 使用模型，
+    checkpoint = None
+    checkpoint_file = 'model.pt'
+    output_path = "./outputs"
+    if os.path.exists(output_path):
+        checkpoint = torch.load(os.path.join(output_path, checkpoint_file))
+    if checkpoint != None:
+        print("test and load from ckpt...")
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        print("load ckpt fail....")
     model.eval()
     test_loss = 0
     correct = 0
 
     for batch_idx, (images, corp_images, target) in enumerate(test_loader):
 
-
         batch_size = images.size(0)
 
         target_indices = target.long().cpu()
         target_one_hot = to_one_hot(batch_size, target, length=model.digits.num_units)
 
-        images, corp_images, target = Variable(images.float()).cuda(), \
-                                    Variable(corp_images.float()).cuda(),\
-                                    Variable(target_one_hot).cuda()
+        images, corp_images, target = images.float().cuda(), \
+                                    corp_images.float().cuda(),\
+                                    target_one_hot.cuda()
 
         output = model(images, corp_images)
 
@@ -64,3 +91,7 @@ def test(dataset, epoch):
         correct,
         len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
+
+
+if __name__ == "__main__":
+    test(dataset, 3)

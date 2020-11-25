@@ -60,3 +60,19 @@ predicted_class: Tensor("ArgMax:0", shape=(?, 1, 1), dtype=int64)
 predicted_class: Tensor("Reshape_7:0", shape=(?,), dtype=int64)
 correct_prediction: Tensor("Equal:0", shape=(?,), dtype=bool)
 accuracy: Tensor("Mean_2:0", shape=(), dtype=float32)
+
+
+
+Train Epoch: 26 [0/2144 (0%)]	Loss: 0.059725	Acc:0.971429
+Train Epoch: 26 [175/2144 (8%)]	Loss: 0.086247	Acc:0.885714
+Train Epoch: 26 [350/2144 (16%)]	Loss: 0.056564	Acc:0.942857
+Train Epoch: 26 [525/2144 (24%)]	Loss: 0.058246	Acc:0.914286
+Train Epoch: 26 [700/2144 (32%)]	Loss: 0.071731	Acc:0.857143
+Train Epoch: 26 [875/2144 (40%)]	Loss: 0.091278	Acc:0.885714
+Train Epoch: 26 [1050/2144 (48%)]	Loss: 0.098899	Acc:0.800000
+Train Epoch: 26 [1225/2144 (56%)]	Loss: 0.065320	Acc:0.914286
+Train Epoch: 26 [1400/2144 (65%)]	Loss: 0.088498	Acc:0.885714
+Train Epoch: 26 [1575/2144 (73%)]	Loss: 0.057045	Acc:0.942857
+Train Epoch: 26 [1750/2144 (81%)]	Loss: 0.062493	Acc:1.000000
+Train Epoch: 26 [1925/2144 (89%)]	Loss: 0.076831	Acc:0.914286
+Train Epoch: 26 [2100/2144 (97%)]	Loss: 0.077719	Acc:0.942857
