@@ -5,9 +5,6 @@
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.autograd import Variable
-from torchvision import datasets, transforms
 import torch.nn.functional as F
 
 
@@ -40,19 +37,17 @@ class CapsuleLayer(nn.Module):
             # that uses this weight matrix.
             self.W = nn.Parameter(torch.randn(1, in_channels, num_units, unit_size, in_units))
         else:
-            # The first convolutional capsule layer (PrimaryCapsules in the paper) does not perform routing.
-            # Instead, it is composed of several convolutional units, each of which sees the full input.
-            # It is implemented as a normal convolutional layer with a special nonlinearity (squash()).
-            def create_conv_unit(unit_idx):
-                unit = ConvUnit(in_channels=in_channels)
-                self.add_module("unit_" + str(unit_idx), unit)
-                return unit
-            self.units = [create_conv_unit(i) for i in range(self.num_units)]
+            self.conv = nn.Conv2d(in_channels=64,
+                       out_channels=32*8,
+                       kernel_size=9,
+                       stride=2,
+                       bias=False)
 
     @staticmethod
     def squash(s):
         s += 0.00001
         # This is equation 1 from the paper.
+        # print("squash s.size():", s.size())
         mag_sq = torch.sum(s**2, dim=-2, keepdim=True)
         mag = torch.sqrt(mag_sq)
         s = (mag_sq / (1.0 + mag_sq)) * (s / mag)
@@ -65,15 +60,12 @@ class CapsuleLayer(nn.Module):
             return self.no_routing(x)
 
     def no_routing(self, x):
-        # Get output for each unit.
-        # Each will be (batch, channels, height, width).
-        u = [self.units[i](x) for i in range(self.num_units)]
 
-        # Stack all unit outputs (batch, unit, channels, height, width).
-        u = torch.stack(u, dim=1)
-
+        u = self.conv(x)
+        # print("u.size():", u.size())
         # Flatten to (batch, unit, output).
         u = u.view(x.size(0), self.num_units, -1)
+        # print("u.size():", u.size())
 
         # Return squashed outputs.
         return CapsuleLayer.squash(u)
@@ -102,6 +94,7 @@ class CapsuleLayer(nn.Module):
         for iteration in range(num_iterations):
             # Convert routing logits to softmax.
             # (batch, features, num_units, 1, 1)
+            # print("b_ij.size():", b_ij.size())
             c_ij = F.softmax(b_ij, dim= 2)
 
             c_ij = torch.cat([c_ij] * batch_size, dim=0).unsqueeze(4)

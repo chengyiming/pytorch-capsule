@@ -5,20 +5,12 @@
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.autograd import Variable
-from torchvision import datasets, transforms
-import torchvision.utils as vutils
-import torch.nn.functional as F
+
 from active_function import Mish
-from create_conv import CreateConv
-
-
-
-from capsule_conv_layer import CapsuleConvLayer
 from capsule_layer import CapsuleLayer
 from capsule_upsample_conv_layer import CapsuleUpsampleConvLayer
-
+from create_conv import CreateConv
+from padding_strategy import Conv2d
 
 class CapsuleNetwork(nn.Module):
     def __init__(self,
@@ -43,9 +35,9 @@ class CapsuleNetwork(nn.Module):
         # images第一个卷积层
         self.images_conv1 = CreateConv(in_channels=1,
                                out_channels=32,
-                               kernel_size=8, # fixme constant
+                               kernel_size=7, # fixme constant
                                stride=2,
-                               padding=3,
+                               padding= "same",
                                bias=True)
         # images第二个卷积层
         self.images_conv2 = CreateConv(in_channels=32,
@@ -58,9 +50,9 @@ class CapsuleNetwork(nn.Module):
         # corp_images第一个卷积层
         self.corp_images_conv1 = CreateConv(in_channels=1,
                                out_channels=32,
-                               kernel_size=8,  # fixme constant
+                               kernel_size=7,  # fixme constant
                                stride=2,
-                               padding= 3,
+                               padding= "same",
                                bias=True)
         # corp_images第二个卷积层
         self.corp_images_conv2 = CreateConv(in_channels=32,

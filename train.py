@@ -1,5 +1,6 @@
 import os
 
+
 import torch
 import torch.optim as optim
 import torch.utils.data
@@ -10,13 +11,14 @@ import datasets
 from capsule_network import CapsuleNetwork
 from conf import global_settings as settings
 
+#训练使用的gpu
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
-
+# 超参数
 learning_rate = 0.0001
-
-test_batch_size = 35
-batch_size = 35
+MAX_EPOCH = 90
+start_epoch = 0
+checkpoint_file = 'model.pt'
 
 # Stop training if loss goes below this threshold.
 early_stop_loss = 0.0001
@@ -25,14 +27,12 @@ dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
 conv_inputs = 64
 conv_outputs = 256
 num_primary_units = 8
-primary_unit_size = 24 * 24 * 32  # fixme get from conv2d
+primary_unit_size = 24 * 24 * 32
 output_unit_size = 32
 
+test_batch_size = 15
+batch_size = 35
 
-
-MAX_EPOCH = 51
-start_epoch = 0
-checkpoint_file = 'model.pt'
 
 # Converts batches of class indices to classes of one-hot vectors.
 def to_one_hot(batch_size, index, length):
@@ -60,6 +60,7 @@ def test(dataset, epoch):
 
     test_loss = 0
     correct = 0
+    model.eval()
 
     for batch_idx, (images, corp_images, target) in enumerate(test_loader):
 
@@ -167,11 +168,12 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
             if last_loss < early_stop_loss:
                 break
 
+
         # 保存
         if not os.path.exists(output_path):
             # 创建目录
             os.makedirs(output_path)
-        # test(dataset, epoch)
+        test(dataset, epoch)
         checkpoint = {
             'model_state_dict':model.state_dict(),
             'optimizer.state_dict':optimizer.state_dict(),

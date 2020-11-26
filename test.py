@@ -46,17 +46,7 @@ def test(dataset, epoch):
 
     test_dataset = datasets.TUMOR_IMG(dataset, train=False, transform=dataset_transform)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
-    # 使用模型，
-    checkpoint = None
-    checkpoint_file = 'model.pt'
-    output_path = "./outputs"
-    if os.path.exists(output_path):
-        checkpoint = torch.load(os.path.join(output_path, checkpoint_file))
-    if checkpoint != None:
-        print("test and load from ckpt...")
-        model.load_state_dict(checkpoint['model_state_dict'])
-    else:
-        print("load ckpt fail....")
+
     model.eval()
     test_loss = 0
     correct = 0

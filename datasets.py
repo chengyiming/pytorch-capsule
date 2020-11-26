@@ -1,10 +1,7 @@
-import json
-import matplotlib.pyplot as plt
-import numpy as np
-from torch.utils.data import Dataset,DataLoader
 import os
 import pickle
-import torch
+
+from torch.utils.data import Dataset
 
 TRAIN_FILE = "train.p"
 TEST_FILE = "test.p"
