@@ -35,7 +35,7 @@ class CapsuleLayer(nn.Module):
         if self.use_routing:
             # In the paper, the deeper capsule layer(s) with capsule inputs (DigitCaps) use a special routing algorithm
             # that uses this weight matrix.
-            self.W = nn.Parameter(torch.randn(1, in_channels, num_units, unit_size, in_units))
+            self.W = nn.Parameter(torch.normal(mean=0, std=0.01, size=(1, in_channels, num_units, unit_size, in_units)))
         else:
             self.conv = nn.Conv2d(in_channels=64,
                        out_channels=32*8,

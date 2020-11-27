@@ -88,7 +88,7 @@ def test():
 
         v_mag = torch.sqrt((output**2).sum(dim=2, keepdim=True))
 
-        pred = v_mag.data.max(1, keepdim=True)[1].cpu()
+        pred = v_mag.data.max(1, keepdim=True)[1]
 
         correct += pred.eq(target_indices.view_as(pred)).sum()
 

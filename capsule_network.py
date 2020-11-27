@@ -62,9 +62,6 @@ class CapsuleNetwork(nn.Module):
                                padding= 0,
                                bias=True)
 
-        # self.merge_conv = CapsuleConvLayer(in_channels=64,
-        #                               out_channels=conv_outputs)
-
         self.primary = CapsuleLayer(in_units=0,
                                     in_channels=64,
                                     num_units=num_primary_units,
@@ -147,14 +144,14 @@ class CapsuleNetwork(nn.Module):
         v_mag = torch.sqrt((input**2).sum(dim=2))
         # Get index of longest capsule output.
         _, v_max_index = v_mag.max(dim=1)
-        v_max_index = v_max_index.data
+        # v_max_index = v_max_index.data
         # [20, 1]
 
         # Use just the winning capsule's representation (and zeros for other capsules) to reconstruct input image.
         batch_size = input.size(0)
         # 20
 
-        one_hot_labels = torch.zeros(batch_size, 3).scatter(1, v_max_index.cpu(), 1).unsqueeze(-1)
+        one_hot_labels = torch.zeros(batch_size, 3).cuda().scatter(1, v_max_index, 1).unsqueeze(-1)
         # [20, 3, 1]
 
         masked = torch.matmul(input.squeeze().transpose(1,2), one_hot_labels.cuda())

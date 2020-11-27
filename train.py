@@ -6,6 +6,8 @@ import torch.optim as optim
 import torch.utils.data
 from tensorboardX import SummaryWriter
 from torchvision import transforms
+from padding_strategy import truncated_normal_
+import torch.nn as nn
 
 import datasets
 from capsule_network import CapsuleNetwork
@@ -60,19 +62,19 @@ def test(dataset, epoch):
 
     test_loss = 0
     correct = 0
+    # 将模型设置成验证模式
     model.eval()
 
     for batch_idx, (images, corp_images, target) in enumerate(test_loader):
 
         batch_size = images.size(0)
 
-        target_indices = target.long().cpu()
+        target_indices = target.long()
         target_one_hot = to_one_hot(batch_size, target, length=model.digits.num_units)
 
         images, corp_images, target = images.float().cuda(), \
                                       corp_images.float().cuda(), \
                                       target_one_hot.cuda()
-
 
         output = model(images, corp_images)
 
@@ -80,19 +82,20 @@ def test(dataset, epoch):
 
         v_mag = torch.sqrt((output ** 2).sum(dim=2, keepdim=True))
 
-        pred = v_mag.data.max(1, keepdim=True)[1].cpu()
+        pred = v_mag.max(1, keepdim=True)[1]
 
-        correct += pred.eq(target_indices.view_as(pred)).sum()
+        correct += pred.eq(target_indices.view_as(pred).cuda()).sum()
 
     test_loss /= len(test_loader.dataset)
+
     # 日志记录
     writer.add_scalar("Test/acc", correct / len(test_loader.dataset), epoch)
     writer.add_scalar("Test/loss", test_loss, epoch)
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.4f})\n'.format(
         test_loss,
         correct,
         len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        float(correct)/len(test_loader.dataset)))
 
 
 # Normalization for TUMOR dataset.
@@ -105,10 +108,20 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
 
     train_dataset = datasets.TUMOR_IMG(dataset, train=True, transform=dataset_transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    model = model.cuda()
+
+    # print(model)
+    # for m in model.modules():
+    #     if isinstance(m, nn.Conv2d):
+    #         print(m.weight.size())
+    #         truncated_normal_(m.weight, mean=0, std=0.1)
+    total = sum([param.nelement() for param in model.parameters()])
+    print("Number of parameter: %.2fM" % (total / 1e6))
     # 尝试加载
     for epoch in range(start_epoch + 1, MAX_EPOCH):
         last_loss = None
         log_interval = 5
+        # 重新置为训练模式
         model.train()
         for batch_idx, (images, corp_images, labels) in enumerate(train_loader):
             # print("target1:", labels)
@@ -139,7 +152,9 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
 
 
             loss = model.loss(images, output, labels)
+            loss.cuda()
             _, _, acc = model.acc(output, origin_labels)
+            acc.cuda()
             loss.backward()
             last_loss = loss.data
             optimizer.step()

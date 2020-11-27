@@ -55,7 +55,7 @@ def test(dataset, epoch):
 
         batch_size = images.size(0)
 
-        target_indices = target.long().cpu()
+        target_indices = target.long()
         target_one_hot = to_one_hot(batch_size, target, length=model.digits.num_units)
 
         images, corp_images, target = images.float().cuda(), \
@@ -68,7 +68,7 @@ def test(dataset, epoch):
 
         v_mag = torch.sqrt((output**2).sum(dim=2, keepdim=True))
 
-        pred = v_mag.data.max(1, keepdim=True)[1].cpu()
+        pred = v_mag.data.max(1, keepdim=True)[1]
 
         correct += pred.eq(target_indices.view_as(pred)).sum()
 
