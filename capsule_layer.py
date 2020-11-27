@@ -8,19 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ConvUnit(nn.Module):
-    def __init__(self, in_channels):
-        super(ConvUnit, self).__init__()
-
-        self.conv0 = nn.Conv2d(in_channels=in_channels,
-                               out_channels=32,  # fixme constant
-                               kernel_size=9,  # fixme constant
-                               stride=2, # fixme constant
-                               bias=True)
-
-    def forward(self, x):
-        return self.conv0(x)
-
 class CapsuleLayer(nn.Module):
     # 0 256 8 24*24*32 false
     # 8 24*24*32 3 32 true

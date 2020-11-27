@@ -1,6 +1,7 @@
 import torch.nn as nn
 from padding_strategy import Conv2d
 from padding_strategy import truncated_normal_
+from active_function import Mish
 
 class CreateConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias):
@@ -21,7 +22,8 @@ class CreateConv(nn.Module):
         self.conv.weight = truncated_normal_(self.conv.weight, mean=0, std=0.01)
 
         self.relu = nn.ReLU(inplace=True)
+        self.mish = Mish()
 
     def forward(self, x):
-        return self.relu(self.conv(x))
+        return self.mish(self.conv(x))
 
