@@ -43,8 +43,8 @@ class CapsuleNetwork(nn.Module):
         self.images_conv2 = CreateConv(in_channels=32,
                                out_channels=32,
                                kernel_size=9, # fixme constant
-                               stride=1,
-                               padding= 0,
+                               stride=2,
+                               padding= "same",
                                bias=True)
 
         # corp_images第一个卷积层
@@ -58,8 +58,8 @@ class CapsuleNetwork(nn.Module):
         self.corp_images_conv2 = CreateConv(in_channels=32,
                                out_channels=32,
                                kernel_size=9,  # fixme constant
-                               stride=1,
-                               padding= 0,
+                               stride=2,
+                               padding= "same",
                                bias=True)
 
         self.primary = CapsuleLayer(in_units=0,

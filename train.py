@@ -14,7 +14,7 @@ from capsule_network import CapsuleNetwork
 from conf import global_settings as settings
 
 #训练使用的gpu
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 # 超参数
 learning_rate = 0.0001
@@ -29,7 +29,7 @@ dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
 conv_inputs = 64
 conv_outputs = 256
 num_primary_units = 8
-primary_unit_size = 24 * 24 * 32
+primary_unit_size = 16 * 16 * 32
 output_unit_size = 32
 
 test_batch_size = 15

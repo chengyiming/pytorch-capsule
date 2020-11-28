@@ -6,6 +6,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from padding_strategy import Conv2d
 
 
 class CapsuleLayer(nn.Module):
@@ -24,10 +25,11 @@ class CapsuleLayer(nn.Module):
             # that uses this weight matrix.
             self.W = nn.Parameter(torch.normal(mean=0, std=0.01, size=(1, in_channels, num_units, unit_size, in_units)))
         else:
-            self.conv = nn.Conv2d(in_channels=64,
+            self.conv = Conv2d(in_channels=64,
                        out_channels=32*8,
-                       kernel_size=9,
+                       kernel_size=3,
                        stride=2,
+                       padding = "same",
                        bias=False)
 
     @staticmethod
