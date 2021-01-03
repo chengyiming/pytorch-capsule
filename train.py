@@ -89,7 +89,7 @@ def test(dataset, epoch):
     test_loss /= len(test_loader.dataset)
 
     # 日志记录
-    writer.add_scalar("Test/acc", correct / len(test_loader.dataset), epoch)
+    writer.add_scalar("Test/acc", float(correct) / len(test_loader.dataset), epoch)
     writer.add_scalar("Test/loss", test_loss, epoch)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.4f})\n'.format(
         test_loss,
@@ -199,7 +199,7 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
 
 if __name__ == "__main__":
     checkpoint = None
-    output_path = "./outputs"
+    output_path = "./outputs_best"
     if os.path.exists(output_path):
         checkpoint = torch.load(os.path.join(output_path, checkpoint_file))
     if checkpoint != None:
