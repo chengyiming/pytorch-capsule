@@ -1,20 +1,17 @@
 import os
 
-
 import torch
 import torch.optim as optim
 import torch.utils.data
 from tensorboardX import SummaryWriter
 from torchvision import transforms
-from padding_strategy import truncated_normal_
-import torch.nn as nn
 
 import datasets
 from capsule_network import CapsuleNetwork
 from conf import global_settings as settings
 
 #训练使用的gpu
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 # 超参数
 learning_rate = 0.0001
@@ -23,7 +20,7 @@ start_epoch = 0
 checkpoint_file = 'model.pt'
 
 # Stop training if loss goes below this threshold.
-early_stop_loss = 0.0001
+
 dataset = "/media/disk/lds/dataset/brain_tumor/512+128/1"
 
 conv_inputs = 64
@@ -89,13 +86,15 @@ def test(dataset, epoch):
     test_loss /= len(test_loader.dataset)
 
     # 日志记录
-    writer.add_scalar("Test/acc", float(correct) / len(test_loader.dataset), epoch)
+    acc = float(correct) / len(test_loader.dataset)
+    writer.add_scalar("Test/acc", acc, epoch)
     writer.add_scalar("Test/loss", test_loss, epoch)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.4f})\n'.format(
         test_loss,
         correct,
         len(test_loader.dataset),
-        float(correct)/len(test_loader.dataset)))
+        acc))
+    return acc
 
 
 # Normalization for TUMOR dataset.
@@ -118,8 +117,8 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
     total = sum([param.nelement() for param in model.parameters()])
     print("Number of parameter: %.2fM" % (total / 1e6))
     # 尝试加载
+    max_acc = 0.0
     for epoch in range(start_epoch + 1, MAX_EPOCH):
-        last_loss = None
         log_interval = 5
         # 重新置为训练模式
         model.train()
@@ -180,26 +179,28 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
                     acc.data
                     ))
 
-            if last_loss < early_stop_loss:
-                break
 
 
         # 保存
         if not os.path.exists(output_path):
             # 创建目录
             os.makedirs(output_path)
-        test(dataset, epoch)
-        checkpoint = {
-            'model_state_dict':model.state_dict(),
-            'optimizer.state_dict':optimizer.state_dict(),
-            'epoch':epoch
-        }
-        torch.save(checkpoint, os.path.join(output_path, checkpoint_file))
+        acc = test(dataset, epoch)
+        # 只存储目前准确率最高的模型
+        if acc > max_acc:
+            print("目前最高的准确率（保存）：", acc)
+            max_acc = acc
+            checkpoint = {
+                'model_state_dict':model.state_dict(),
+                'optimizer.state_dict':optimizer.state_dict(),
+                'epoch':epoch
+            }
+            torch.save(checkpoint, os.path.join(output_path, checkpoint_file))
 
 
 if __name__ == "__main__":
     checkpoint = None
-    output_path = "./outputs_best"
+    output_path = "./outputs3"
     if os.path.exists(output_path):
         checkpoint = torch.load(os.path.join(output_path, checkpoint_file))
     if checkpoint != None:
