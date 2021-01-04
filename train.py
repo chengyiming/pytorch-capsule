@@ -11,7 +11,7 @@ from capsule_network import CapsuleNetwork
 from conf import global_settings as settings
 
 #训练使用的gpu
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # 超参数
 learning_rate = 0.0001
@@ -188,7 +188,7 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
         acc = test(dataset, epoch)
         # 只存储目前准确率最高的模型
         if acc > max_acc:
-            print("目前最高的准确率（保存）：", acc)
+            print("目前最高的准确率（保存）：{:.6f}".format(acc))
             max_acc = acc
             checkpoint = {
                 'model_state_dict':model.state_dict(),
@@ -200,7 +200,7 @@ def train(dataset, model, optimizer, start_epoch, output_path = None):
 
 if __name__ == "__main__":
     checkpoint = None
-    output_path = "./outputs3"
+    output_path = settings.MODEL_PATH
     if os.path.exists(output_path):
         checkpoint = torch.load(os.path.join(output_path, checkpoint_file))
     if checkpoint != None:
